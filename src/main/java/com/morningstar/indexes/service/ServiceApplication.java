@@ -1,5 +1,7 @@
 package com.morningstar.indexes.service;
 
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -34,9 +36,11 @@ public class ServiceApplication {
 @ResponseBody
 class CustomerHttpController {
     private final CustomerService service;
+    private final ObservationRegistry registry;
 
-    CustomerHttpController(CustomerService service) {
+    CustomerHttpController(CustomerService service, ObservationRegistry registry) {
         this.service = service;
+        this.registry = registry;
     }
 
     @GetMapping("/customers")
@@ -47,7 +51,8 @@ class CustomerHttpController {
     @GetMapping("/customers/{name}")
     Customer byId(@PathVariable String name) {
         Assert.state(Character.isUpperCase(name.charAt(0)), "Name must start with a capital letter");
-        return service.byName(name);
+        return Observation.createNotStarted("byName", this.registry)
+                .observe(() -> service.byName(name));
     }
 
 }
