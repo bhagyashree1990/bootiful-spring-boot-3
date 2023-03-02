@@ -5,12 +5,15 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.Bean;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.ProblemDetail;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
+import org.springframework.stereotype.Controller;
 import org.springframework.stereotype.Service;
+import org.springframework.util.Assert;
+import org.springframework.web.bind.annotation.*;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.Collection;
 
 @SpringBootApplication
@@ -27,6 +30,38 @@ public class ServiceApplication {
 
 }
 
+@Controller
+@ResponseBody
+class CustomerHttpController {
+    private final CustomerService service;
+
+    CustomerHttpController(CustomerService service) {
+        this.service = service;
+    }
+
+    @GetMapping("/customers")
+    Collection<Customer> all() {
+        return service.all();
+    }
+
+    @GetMapping("/customers/{name}")
+    Customer byId(@PathVariable String name) {
+        Assert.state(Character.isUpperCase(name.charAt(0)), "Name must start with a capital letter");
+        return service.byName(name);
+    }
+
+}
+
+@ControllerAdvice
+class ErrorHandlingControllerAdvice {
+    @ExceptionHandler
+    ProblemDetail handleIllegalStateException(IllegalStateException exception) {
+        ProblemDetail pd = ProblemDetail.forStatus(HttpStatusCode.valueOf(404));
+        pd.setDetail("Name must start with a capital letter");
+        return pd;
+    }
+}
+
 @Service
 class CustomerService {
     private final JdbcTemplate template;
@@ -41,9 +76,9 @@ class CustomerService {
         return this.template.query("select * from customers", this.customerRowMapper);
     }
 
-	Customer byId(Integer id) {
-		return this.template.queryForObject("select * from customers where id = ?", this.customerRowMapper, id);
-	}
+    Customer byName(String name) {
+        return this.template.queryForObject("select * from customers where name = ?", this.customerRowMapper, name);
+    }
 }
 
 record Customer(Integer id, String name) {
